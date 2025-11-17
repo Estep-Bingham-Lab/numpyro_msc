@@ -1,0 +1,169 @@
+import jax
+from jax import lax
+from jax import numpy as jnp
+from jax import random
+
+from numpyro.infer import MCMC, NUTS
+
+##############################################################################
+# main function
+##############################################################################
+
+def many_short_chains(
+        model,
+        rng_key,
+        n_super = 8,
+        n_within = 8,
+        n_adapt = 2**10,
+        n_steps = 2**10,
+        kernel_class = NUTS,
+        kernel_params = {'max_tree_depth': 8},
+        model_args = (),
+        model_kwargs = {},
+        mcmc_kwargs = {},
+        run_kwargs = {},
+        keep_last_step_only = True,
+    ):
+    """
+    Many short chains sampling as described in [Ref]_.
+
+    Vectorized sampling of `n_super` superchains, each with `n_within` chains.
+
+    :param model: Target NumPyro model.
+    :param rng_key: The PRNG key that the sampler should use for simulation.
+    :param n_super: Number of superchains (`K` in [Ref]_).
+    :param n_within: Number of chains within each superchain (`M` in [Ref]_).
+    :param n_adapt: Number of adaptation steps.
+    :param n_steps: Number of sampling steps.
+    :param kernel_class: A constructor for the MCMC kernel.
+    :param kernel_params: Optional parameters for the MCMC kernel.
+    :param model_args: Optional `args` for the model.
+    :param model_kwargs: Optional `kwargs` for the model.
+    :param mcmc_kwargs: Optional `kwargs` for building the MCMC object.
+    :param run_kwargs: Optional `kwargs` for building the `MCMC.run` function.
+    :param keep_last_step_only: If true, only the last step of the sampling
+        phase.
+    :return: A :class:`numpyro.infer.MCMC` object.
+    
+    .. rubric:: References
+
+    .. [Ref] Margossian, C. C., Hoffman, M. D., Sountsov, P., Riou-Durand, L., 
+        Vehtari, A., & Gelman, A. (2024). Nested ̂R: Assessing the convergence 
+        of Markov chain Monte Carlo when running many short chains. *Bayesian 
+        Analysis*, 1(1), 1-28. 
+    """
+    init_key, run_key = random.split(rng_key)
+
+    # maybe update mcmc_kwargs
+    if keep_last_step_only:
+        mcmc_kwargs = {'thinning': n_steps, **mcmc_kwargs}
+
+    # Find initial points for superchains
+    init_params = sample_n_super_init_params(
+        kernel_class(model, **kernel_params), 
+        n_super,
+        n_within,
+        init_key,
+        model_args,
+        model_kwargs,
+        run_kwargs,
+    )
+
+    # Build kernel
+    kernel = kernel_class(model, **kernel_params)
+
+    # sample
+    # Each chain has its own sets of kernel parameters. It may violate some
+    # simplifying assumptions in the mathematical analysis, but all
+    # the kernels should produce convergent chains. This is discussed in
+    # the 2nd paragraph of Section 2 of the paper.
+    mcmc = run(
+        kernel, 
+        run_key,
+        n_adapt, 
+        n_steps, 
+        init_params,
+        model_args,
+        model_kwargs,
+        mcmc_kwargs,
+        run_kwargs
+    )  
+
+    return mcmc
+
+##############################################################################
+# low level utilities
+##############################################################################
+
+def sample_n_super_init_params(
+        kernel, 
+        n_super,
+        n_within,
+        rng_key,
+        model_args,
+        model_kwargs,
+        run_kwargs
+    ):
+    """
+    Sample `n_super` initial points, intended to be shared among all `n_within`
+    chains inside a super chain.
+    """
+    rng_key, init_key = random.split(rng_key)
+    init_keys = random.split(init_key, n_super) if n_super > 1 else rng_key # avoid creating a singleton dimension
+    mcmc = MCMC(
+        kernel,
+        num_chains=n_super,
+        num_warmup=0, 
+        num_samples=1, 
+        chain_method="vectorized",
+        progress_bar=False
+    )
+    mcmc.run(init_keys, *model_args, **(run_kwargs | model_kwargs))
+    super_init_params = getattr(mcmc.last_state, kernel.sample_field)
+    
+    # repeat each super chain param `n_within` times, for a total of
+    #   n_chains = n_super * n_within
+    # initial points
+    return jax.tree.map(
+        lambda x: jnp.repeat(
+            x if n_super>1 else lax.expand_dims(x, (0,)),
+            n_within,
+            axis=0
+        ),
+        super_init_params
+    )
+
+def run(
+        kernel, 
+        rng_key,
+        num_warmup, 
+        num_samples, 
+        init_params,
+        model_args,
+        model_kwargs,
+        mcmc_kwargs,
+        run_kwargs
+    ):
+    """
+    Sample `n_super` super chains from different `init_params`. Each chain
+    inside a super chain is started from the same initial point.
+    """
+    assert 'init_params' not in run_kwargs, "`init_params` should not be passed via `run_kwargs`"
+    run_kwargs = {'init_params': init_params} | run_kwargs
+    n_chains = next(iter(init_params.values())).shape[0]
+    run_keys = random.split(rng_key, n_chains)
+    mcmc = MCMC(
+        kernel, 
+        num_chains=n_chains,
+        num_warmup=num_warmup, 
+        num_samples=num_samples, 
+        chain_method="vectorized",
+        **mcmc_kwargs
+    )
+    mcmc.run(
+        run_keys, 
+        *model_args,
+        **(run_kwargs | model_kwargs)
+    )
+    return mcmc
+

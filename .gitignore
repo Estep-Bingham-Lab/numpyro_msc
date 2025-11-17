@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.txt
+temp*.py
+poetry.lock
+.coverage
+coverage.xml
+.vscode/
+*.png
+!docs/_static/img/*.png

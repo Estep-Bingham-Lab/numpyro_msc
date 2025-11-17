@@ -1,0 +1,21 @@
+[project]
+name = "numpyro_msc"
+version = "0.1.0"
+description = "Many-short-chains sampling with NumPyro à la Margossian et al. (2024)"
+authors = [
+    {name = "Miguel Biron-Lattes", email = "miguelbl9@gmail.com"}
+]
+license = "Apache-2.0"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "jax",
+    "numpyro",
+]
+
+[project.urls]
+Repository = "https://github.com/Estep-Bingham-Lab/numpyro_msc.git"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
