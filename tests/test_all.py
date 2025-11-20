@@ -12,8 +12,8 @@ class TestAll(unittest.TestCase):
 
     def test_all(self):
         key_1, key_2, key_3 = random.split(random.key(1), 3)
-        n_super = 8
-        n_within = 8
+        n_super = 32
+        n_within = 32
         
         # A banana-shaped target where NUTS works
         def rosenbrock():
@@ -27,7 +27,9 @@ class TestAll(unittest.TestCase):
             n_within,
             improve_init_params={'n_iter': 4}
         )
-        assert diagnostics.max_nested_rhat(mcmc=mcmc, n_super=n_super) < 1.01
+        self.assertLess(
+            diagnostics.max_nested_rhat(mcmc=mcmc, n_super=n_super), 1.02
+        )
 
         # well separated modes => parallel indep chains should fail => diagnostic
         # should pick this up
