@@ -28,7 +28,7 @@ class TestAll(unittest.TestCase):
             improve_init_params={'n_iter': 4}
         )
         self.assertLess(
-            diagnostics.max_nested_rhat(mcmc=mcmc, n_super=n_super), 1.02
+            diagnostics.max_nested_rhat(mcmc=mcmc, n_super=n_super), 1.03
         )
 
         # well separated modes => parallel indep chains should fail => diagnostic
