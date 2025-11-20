@@ -64,10 +64,14 @@ def nested_rhat_univariate(xs):
     xs_shape = jnp.shape(xs)
     assert len(xs_shape) == 3
     n_super, n_within, n_steps = xs_shape
-    assert n_super > 1 and n_within > 0 and n_steps > 0
+    assert n_super > 0 and n_within > 0 and n_steps > 0
 
    # hatB, Eq 6
-    var_of_superchain_means = xs.mean(axis=(-1,-2)).var(ddof=1)
+    var_of_superchain_means = (
+        jnp.zeros((), xs.dtype)
+        if n_super == 1 
+        else xs.mean(axis=(-1,-2)).var(ddof=1)
+    )
 
     # tildeB
     within_superchain_vars_of_means = (

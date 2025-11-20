@@ -124,14 +124,16 @@ def improve_initial_params(
     potential_fn = potential_fn_gen(*model_args, **model_kwargs)
     opt_fun = partial(utils.optimize_fun, potential_fn, **opt_params)
 
-    # find n_super and use it to determine if vectorization is needed
-    first_param_shape = next(iter(super_init_params.values())).shape
-    if first_param_shape == next(iter(dummy_init_params.values())).shape:
+    # find n_super by comparing shapes of an arbitrary param
+    # use it to determine if vectorization is needed
+    any_param_name  = next(iter(super_init_params.keys()))
+    any_param_shape = super_init_params[any_param_name].shape
+    if any_param_shape == dummy_init_params[any_param_name].shape:
         n_super = 1
         maybe_vmap_pot_fn = potential_fn
         maybe_vmap_opt_fun = opt_fun
     else:
-        n_super = first_param_shape[0]
+        n_super = any_param_shape[0]
         maybe_vmap_pot_fn = jax.vmap(potential_fn)
         maybe_vmap_opt_fun = jax.vmap(opt_fun)
     
