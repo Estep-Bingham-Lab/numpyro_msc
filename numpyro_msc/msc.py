@@ -1,9 +1,14 @@
+from functools import partial
+
 import jax
 from jax import lax
 from jax import numpy as jnp
 from jax import random
 
+import numpyro
 from numpyro.infer import MCMC, NUTS
+
+from numpyro_msc import utils
 
 ##############################################################################
 # main function
@@ -23,6 +28,7 @@ def many_short_chains(
         mcmc_kwargs = {},
         run_kwargs = {},
         keep_last_step_only = True,
+        improve_init_params = False
     ):
     """
     Many short chains sampling as described in [Ref]_.
@@ -41,8 +47,11 @@ def many_short_chains(
     :param model_kwargs: Optional `kwargs` for the model.
     :param mcmc_kwargs: Optional `kwargs` for building the MCMC object.
     :param run_kwargs: Optional `kwargs` for building the `MCMC.run` function.
-    :param keep_last_step_only: If true, only the last step of the sampling
+    :param keep_last_step_only: If `True`, only the last step of the sampling
         phase.
+    :param improve_init_params: If `True`, run L-BFGS to improve each of the
+        `n_super` initial points. It can also be a `dict` with settings passed
+        to :func:`utils.optimize_fun`.
     :return: A :class:`numpyro.infer.MCMC` object.
     
     .. rubric:: References
@@ -67,6 +76,7 @@ def many_short_chains(
         model_args,
         model_kwargs,
         run_kwargs,
+        improve_init_params
     )
 
     # Build kernel
@@ -95,6 +105,49 @@ def many_short_chains(
 # low level utilities
 ##############################################################################
 
+def improve_initial_params(
+        model,
+        super_init_params,
+        rng_key,
+        model_args,
+        model_kwargs,
+        opt_params
+    ):
+    params_info, potential_fn_gen = numpyro.infer.util.initialize_model(
+        rng_key,
+        model,
+        dynamic_args=True,
+        model_args=model_args,
+        model_kwargs=model_kwargs,
+    )[:2]
+    dummy_init_params = params_info[0]
+    potential_fn = potential_fn_gen(*model_args, **model_kwargs)
+    opt_fun = partial(utils.optimize_fun, potential_fn, **opt_params)
+
+    # find n_super and use it to determine if vectorization is needed
+    first_param_shape = next(iter(super_init_params.values())).shape
+    if first_param_shape == next(iter(dummy_init_params.values())).shape:
+        n_super = 1
+        maybe_vmap_pot_fn = potential_fn
+        maybe_vmap_opt_fun = opt_fun
+    else:
+        n_super = first_param_shape[0]
+        maybe_vmap_pot_fn = jax.vmap(potential_fn)
+        maybe_vmap_opt_fun = jax.vmap(opt_fun)
+    
+    # print info
+    print(f"Improving {n_super} random initial points via L-BFGS optimization")
+    print("Starting energies")
+    print(maybe_vmap_pot_fn(super_init_params))
+    
+    # optimize
+    opt_super_init_params = maybe_vmap_opt_fun(super_init_params)
+
+    # print info and return
+    print(f"Final energies:")
+    print(maybe_vmap_pot_fn(opt_super_init_params))
+    return opt_super_init_params
+
 def sample_n_super_init_params(
         kernel, 
         n_super,
@@ -102,7 +155,8 @@ def sample_n_super_init_params(
         rng_key,
         model_args,
         model_kwargs,
-        run_kwargs
+        run_kwargs,
+        solver_settings,
     ):
     """
     Sample `n_super` initial points, intended to be shared among all `n_within`
@@ -121,6 +175,17 @@ def sample_n_super_init_params(
     mcmc.run(init_keys, *model_args, **(run_kwargs | model_kwargs))
     super_init_params = getattr(mcmc.last_state, kernel.sample_field)
     
+    # improve parameters using L-BFGS optimization
+    if solver_settings:
+        super_init_params = improve_initial_params(
+            kernel.model,
+            super_init_params,
+            rng_key,
+            model_args,
+            model_kwargs,
+            solver_settings if isinstance(solver_settings, dict) else {}
+        )
+
     # repeat each super chain param `n_within` times, for a total of
     #   n_chains = n_super * n_within
     # initial points

@@ -18,7 +18,7 @@ from jax import numpy as jnp
 import numpyro
 from numpyro import distributions as dist 
 
-from numpyro_msc import msc, nested_rhat
+from numpyro_msc import msc, diagnostics
 
 # A banana-shaped target where NUTS works
 def rosenbrock():
@@ -35,7 +35,7 @@ mcmc = msc.many_short_chains(rosenbrock, rng_key, n_super, n_within)
 sample: 100%|█████████████████████████████| 2048/2048 [00:10<00:00, 203.85it/s]
 ```
 ```python
-print(nested_rhat.nested_rhats(mcmc=mcmc, n_super=n_super))
+print(diagnostics.nested_rhats(mcmc=mcmc, n_super=n_super))
 ```
 ```
 {'x': Array(1.0045928, dtype=float32), 'y': Array(1.0074906, dtype=float32)}
