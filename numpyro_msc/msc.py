@@ -31,14 +31,14 @@ def many_short_chains(
         improve_init_params = False
     ):
     """
-    Many short chains sampling as described in [Ref]_.
+    Many short chains sampling as described in [1].
 
     Vectorized sampling of `n_super` superchains, each with `n_within` chains.
 
     :param model: Target NumPyro model.
     :param rng_key: The PRNG key that the sampler should use for simulation.
-    :param n_super: Number of superchains (`K` in [Ref]_).
-    :param n_within: Number of chains within each superchain (`M` in [Ref]_).
+    :param n_super: Number of superchains (`K` in [1]).
+    :param n_within: Number of chains within each superchain (`M` in [1]).
     :param n_adapt: Number of adaptation steps.
     :param n_steps: Number of sampling steps.
     :param kernel_class: A constructor for the MCMC kernel.
@@ -56,7 +56,7 @@ def many_short_chains(
     
     .. rubric:: References
 
-    .. [Ref] Margossian, C. C., Hoffman, M. D., Sountsov, P., Riou-Durand, L., 
+    .. [1] Margossian, C. C., Hoffman, M. D., Sountsov, P., Riou-Durand, L., 
         Vehtari, A., & Gelman, A. (2024). Nested ̂R: Assessing the convergence 
         of Markov chain Monte Carlo when running many short chains. *Bayesian 
         Analysis*, 1(1), 1-28. 

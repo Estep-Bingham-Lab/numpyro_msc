@@ -36,13 +36,13 @@ def lbfgs_loop(target_fun, init_params, n_iter, lbfgs_params):
         length = n_iter
     )[0][0]
 
-def optimize_fun(target_fun, init_params, n_iter = 2**7, **lbfgs_params):
+def optimize_fun(target_fun, init_params, n_iter = 16, **lbfgs_params):
     """
     Minimize a function using a two step procedure. We first use ADAM to 
     find the basis of attraction of the mode. Then, we use the 
     quasi-Newton method L-BFGS to home in the local mode. Initializing with
     ADAM overcomes some difficulties encountered when deploying L-BFGS using
-    single-precision (32 bit) floats [Ref]_.
+    single-precision (32 bit) floats [1]_.
 
     :param target_fun: A loss function to minimize.
     :param init_params: The starting pytree.
@@ -53,7 +53,7 @@ def optimize_fun(target_fun, init_params, n_iter = 2**7, **lbfgs_params):
 
     .. rubric:: References
 
-    .. [Ref] Kiyani, E., Shukla, K., Urbán, J. F., Darbon, J., & Karniadakis, 
+    .. [1] Kiyani, E., Shukla, K., Urbán, J. F., Darbon, J., & Karniadakis, 
         G. E. (2025). Optimizing the optimizer for physics-informed neural 
         networks and Kolmogorov-Arnold networks. Computer Methods in Applied 
         Mechanics and Engineering, 446, 118308..
