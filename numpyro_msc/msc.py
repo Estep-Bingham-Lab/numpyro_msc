@@ -49,9 +49,9 @@ def many_short_chains(
     :param run_kwargs: Optional `kwargs` for building the `MCMC.run` function.
     :param keep_last_step_only: If `True`, only the last step of the sampling
         phase.
-    :param improve_init_params: If `True`, run L-BFGS to improve each of the
-        `n_super` initial points. It can also be a `dict` with settings passed
-        to :func:`utils.optimize_fun`.
+    :param improve_init_params: If `True`, run an initial optimization phase
+        to improve each of the `n_super` initial points. This argument can also 
+        be a `dict` with settings passed to :func:`utils.optimize_fun`.
     :return: A :class:`numpyro.infer.MCMC` object.
     
     .. rubric:: References
@@ -138,7 +138,7 @@ def improve_initial_params(
         maybe_vmap_opt_fun = jax.vmap(opt_fun)
     
     # print info
-    print(f"Improving {n_super} random initial points via L-BFGS optimization")
+    print(f"Improving {n_super} random initial points via optimization")
     print("Starting energies")
     print(maybe_vmap_pot_fn(super_init_params))
     
