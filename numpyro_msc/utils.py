@@ -39,8 +39,8 @@ def lbfgs_loop(target_fun, init_params, n_iter, lbfgs_params):
 def optimize_fun(target_fun, init_params, n_iter = 16, **lbfgs_params):
     """
     Minimize a function using a two step procedure. We first use ADAM to 
-    find the basis of attraction of the mode. Then, we use the 
-    quasi-Newton method L-BFGS to home in the local mode. Initializing with
+    find the basis of attraction of a mode. Then, we use the 
+    quasi-Newton method L-BFGS to home in on the mode itself. Initializing with
     ADAM overcomes some difficulties encountered when deploying L-BFGS using
     single-precision (32 bit) floats [1]_.
 
