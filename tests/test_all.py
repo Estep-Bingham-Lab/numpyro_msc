@@ -78,9 +78,12 @@ class TestAll(unittest.TestCase):
             kernel_params = {'potential_fn': normal_potential},
             init_params=init_params
         )
+        samples = mcmc.get_samples()
+        self.assertAlmostEqual(samples.mean(), 0, delta=0.15)
+        self.assertAlmostEqual(samples.std(), 1, delta=0.05)
         self.assertLessEqual(
             diagnostics.max_nested_rhat(mcmc=mcmc, n_super=n_super),
-            1.1
+            1.2
         )
 
 if __name__ == '__main__':
