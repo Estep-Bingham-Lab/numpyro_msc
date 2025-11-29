@@ -63,6 +63,28 @@ class TestAll(unittest.TestCase):
             diagnostics.max_nested_rhat(mcmc=mcmc, n_super=n_super), 1.0
         )
 
+        # check using a potential function and passing init_params works
+        def normal_potential(x):
+            return 0.5*jnp.square(x).sum()
+
+        dim = 4
+        n_super = 8
+        init_key, run_key = random.split(random.key(1),2)
+        init_params = random.normal(init_key, (n_super, dim))
+        mcmc = msc.many_short_chains(
+            None, 
+            run_key,
+            n_super,
+            kernel_params = {'potential_fn': normal_potential},
+            init_params=init_params
+        )
+        samples = mcmc.get_samples()
+        self.assertAlmostEqual(samples.mean(), 0, delta=0.15)
+        self.assertAlmostEqual(samples.std(), 1, delta=0.1)
+        self.assertLessEqual(
+            diagnostics.max_nested_rhat(mcmc=mcmc, n_super=n_super),
+            1.2
+        )
 
 if __name__ == '__main__':
     unittest.main()
