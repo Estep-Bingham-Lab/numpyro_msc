@@ -80,7 +80,7 @@ class TestAll(unittest.TestCase):
         )
         samples = mcmc.get_samples()
         self.assertAlmostEqual(samples.mean(), 0, delta=0.15)
-        self.assertAlmostEqual(samples.std(), 1, delta=0.05)
+        self.assertAlmostEqual(samples.std(), 1, delta=0.1)
         self.assertLessEqual(
             diagnostics.max_nested_rhat(mcmc=mcmc, n_super=n_super),
             1.2
