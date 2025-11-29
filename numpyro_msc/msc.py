@@ -4,6 +4,7 @@ import jax
 from jax import lax
 from jax import numpy as jnp
 from jax import random
+from jax.typing import ArrayLike
 
 import numpyro
 from numpyro.infer import MCMC, NUTS
@@ -28,7 +29,8 @@ def many_short_chains(
         mcmc_kwargs = {},
         run_kwargs = {},
         keep_last_step_only = True,
-        improve_init_params = False
+        improve_init_params = False,
+        init_params = None
     ):
     """
     Many short chains sampling as described in [1].
@@ -52,6 +54,9 @@ def many_short_chains(
     :param improve_init_params: If `True`, run an initial optimization phase
         to improve each of the `n_super` initial points. This argument can also 
         be a `dict` with settings passed to :func:`utils.optimize_fun`.
+    :param init_params: Optionally, you can directly pass the `n_super` initial
+        points. They will not be improved even if `improve_init_params` is set
+        to `True`.
     :return: A :class:`numpyro.infer.MCMC` object.
     
     .. rubric:: References
@@ -68,15 +73,34 @@ def many_short_chains(
         mcmc_kwargs = {'thinning': n_steps, **mcmc_kwargs}
 
     # Find initial points for superchains
-    init_params = sample_n_super_init_params(
-        kernel_class(model, **kernel_params), 
-        n_super,
-        n_within,
-        init_key,
-        model_args,
-        model_kwargs,
-        run_kwargs,
-        improve_init_params
+    if init_params is None:
+        init_params = sample_n_super_init_params(
+            kernel_class(model, **kernel_params), 
+            n_super,
+            init_key,
+            model_args,
+            model_kwargs,
+            run_kwargs,
+            improve_init_params
+        )
+    else:
+        it = (
+            [init_params] if isinstance(init_params, ArrayLike) 
+            else init_params.values()
+        )
+        assert all(v.shape[0] == n_super for v in it), "You must pass n_super="
+        f"{n_super} `init_params`"
+
+    # repeat each super chain param `n_within` times, for a total of
+    #   n_chains = n_super * n_within
+    # initial points
+    init_params = jax.tree.map(
+        lambda x: jnp.repeat(
+            x if n_super>1 else lax.expand_dims(x, (0,)),
+            n_within,
+            axis=0
+        ),
+        init_params
     )
 
     # Build kernel
@@ -153,7 +177,6 @@ def improve_initial_params(
 def sample_n_super_init_params(
         kernel, 
         n_super,
-        n_within,
         rng_key,
         model_args,
         model_kwargs,
@@ -188,17 +211,7 @@ def sample_n_super_init_params(
             solver_settings if isinstance(solver_settings, dict) else {}
         )
 
-    # repeat each super chain param `n_within` times, for a total of
-    #   n_chains = n_super * n_within
-    # initial points
-    return jax.tree.map(
-        lambda x: jnp.repeat(
-            x if n_super>1 else lax.expand_dims(x, (0,)),
-            n_within,
-            axis=0
-        ),
-        super_init_params
-    )
+    return super_init_params
 
 def run(
         kernel, 
@@ -217,7 +230,10 @@ def run(
     """
     assert 'init_params' not in run_kwargs, "`init_params` should not be passed via `run_kwargs`"
     run_kwargs = {'init_params': init_params} | run_kwargs
-    n_chains = next(iter(init_params.values())).shape[0]
+    n_chains = (
+        init_params.shape[0] if isinstance(init_params, ArrayLike)
+        else next(iter(init_params.values())).shape[0]
+    )
     run_keys = random.split(rng_key, n_chains)
     mcmc = MCMC(
         kernel, 
